@@ -24,6 +24,14 @@ This repo is curated by its maintainers for **Podcast Design Canvas**. A technic
 
 Submit one focused product improvement at a time. The maintainers prefer small, complete, verifiable changes over broad speculative rewrites.
 
+## Current Contribution Focus
+
+This repo is currently accepting implementation work only.
+
+Accepted PRs should ship or directly verify product behavior through code, prototypes, tests, workflows, configuration, or implementation changes.
+
+Docs-only, spec-only, planning-only, README/CONTRIBUTING/VISION-only, Markdown-only, typo-only, and stale-reference PRs are closed by default. They do not receive positive labels or score.
+
 A PR should include:
 - the user-facing improvement
 - the workflow or taste rule it advances
@@ -32,7 +40,9 @@ A PR should include:
 
 ## Maintainer Policy
 
-The default policy is merge or close. If work is not mergeable now, maintainers close it with guidance for a cleaner future submission instead of leaving long requested-change queues open.
+The default policy is merge or close. There is no long requested-changes queue.
+
+Merge requires unanimous maintainer approval. A PR is merged only when it is ready now, aligned with the Vision Model, and clearly improves the product more than the complexity, code, dependencies, abstractions, surface area, or maintenance burden it adds.
 
 Maintainers merge work that:
 - Merge clean PRs that pass CI, match the Vision Model, and improve an accepted workflow or quality bar.
@@ -41,14 +51,16 @@ Maintainers merge work that:
 - Summarize merged work as product progress, not as raw PR activity.
 
 Maintainers close work that:
-- Close PRs that are incomplete, off-vision, overlapping, stale, or likely to create product drift.
-- Do not leave requested-change queues by default. Close with clear resubmission guidance.
+- Close PRs that are incomplete, off-vision, overlapping, stale, docs-only, spec-only, planning-only, too small to matter, reward-farming, or likely to create product drift.
+- Close technically plausible PRs when the benefit is not clearly greater than the complexity or surface area added.
 - Close technically correct PRs when they solve the wrong problem or move the product away from the captured vision.
-- If a PR is promising but messy, explain the clean smaller PR that should be submitted next.
+- Closed comments explain why the PR was closed. They are not an invitation to keep revising the same PR unless the maintainer explicitly says so.
 
 ## Labels
 
-Use labels that match this repo. They are part of the maintainer policy and should not be treated as generic tags.
+Labels are economic scoring signals, not generic tags. Positive labels are only applied to accepted code, prototype, test, workflow, configuration, or implementation changes.
+
+Docs-only, spec-only, planning-only, README/CONTRIBUTING/VISION-only, Markdown-only, typo-only, and stale-reference PRs receive no positive labels, even when directionally useful.
 
 | Label | Multiplier | Meaning |
 | --- | ---: | --- |
