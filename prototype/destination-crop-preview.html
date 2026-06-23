@@ -52,7 +52,21 @@
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
+      }
+
+      .toolbar-stack {
+        display: grid;
+        gap: 14px;
         margin: 24px 0;
+      }
+
+      .toolbar-label {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
       }
 
       button {
@@ -196,6 +210,90 @@
         text-align: right;
       }
 
+      .lower-third {
+        position: absolute;
+        left: 7%;
+        bottom: 18%;
+        max-width: 30%;
+        border-radius: 6px;
+        background: rgba(14, 26, 23, 0.78);
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 800;
+        padding: 9px 10px;
+      }
+
+      .sponsor-tag {
+        position: absolute;
+        right: 7%;
+        bottom: 18%;
+        border-radius: 999px;
+        background: #f7e0ad;
+        color: #503300;
+        font-size: 13px;
+        font-weight: 900;
+        padding: 8px 12px;
+      }
+
+      .review-stamp {
+        position: absolute;
+        top: 7%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 999px;
+        background: rgba(15, 24, 22, 0.72);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        padding: 8px 12px;
+        text-transform: uppercase;
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .summary {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 12px;
+      }
+
+      .summary strong,
+      .summary span {
+        display: block;
+      }
+
+      .summary strong {
+        margin-bottom: 4px;
+      }
+
+      .summary span {
+        color: var(--muted);
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        border-radius: 999px;
+        background: #eef4f2;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 700;
+        padding: 0 11px;
+      }
+
       .issues {
         display: grid;
         gap: 10px;
@@ -229,61 +327,202 @@
       <h1>Destination crop preview</h1>
       <p class="lede">Check whether speakers, captions, logos, and title text survive each publishing surface before export.</p>
 
-      <div class="toolbar" id="toolbar"></div>
+      <div class="toolbar-stack">
+        <div>
+          <p class="toolbar-label">Surface</p>
+          <div class="toolbar" id="surfaceToolbar"></div>
+        </div>
+        <div>
+          <p class="toolbar-label">Moment</p>
+          <div class="toolbar" id="momentToolbar"></div>
+        </div>
+      </div>
 
       <section class="workspace">
         <div class="panel preview-wrap">
           <div id="preview" class="preview wide" aria-label="Episode crop preview">
             <div class="logo">PDC</div>
-            <div class="title">Building a reusable podcast style</div>
+            <div class="title" id="titleText">Building a reusable podcast style</div>
             <div class="speaker host" aria-label="Host frame"></div>
             <div class="speaker guest" aria-label="Guest frame"></div>
-            <div class="caption">Guest explains the launch story with host reaction.</div>
+            <div class="lower-third" id="lowerThird">Guest reaction clip</div>
+            <div class="sponsor-tag" id="sponsorTag" hidden>Sponsored mention</div>
+            <div class="review-stamp" id="reviewStamp" hidden>Review copy</div>
+            <div class="caption" id="captionText">Guest explains the launch story with host reaction.</div>
           </div>
         </div>
 
         <aside class="panel">
           <h2>Crop checks</h2>
-          <div id="issues" class="issues" aria-live="polite"></div>
+          <div class="stack" aria-live="polite">
+            <div id="contextSummary" class="summary"></div>
+            <div id="issueChips" class="chip-row"></div>
+            <div id="issues" class="issues"></div>
+          </div>
         </aside>
       </section>
     </main>
 
     <script>
       const surfaces = {
-        wide: "Wide episode",
-        mobile: "Mobile crop",
-        square: "Square preview",
-        thumbnail: "Thumbnail",
+        wide: {
+          label: "Wide episode",
+          previewClass: "wide",
+          note: "This is the baseline long-form export the creator is about to publish.",
+        },
+        mobile: {
+          label: "Mobile crop",
+          previewClass: "mobile",
+          note: "Check whether a vertical crop still keeps the active speaker and captions readable.",
+        },
+        square: {
+          label: "Square preview",
+          previewClass: "square",
+          note: "Use this to catch branding, speaker balance, and caption overlap in square social previews.",
+        },
+        thumbnail: {
+          label: "Thumbnail",
+          previewClass: "thumbnail",
+          note: "Thumbnail view should prove the title and framing still work when the player is tiny.",
+        },
+        review: {
+          label: "Client review copy",
+          previewClass: "wide",
+          note: "The review copy should show the framing decision and the review marker at the same time.",
+        },
+        archive: {
+          label: "Archive master",
+          previewClass: "wide",
+          note: "Archive preview should stay clean and preserve the long-form frame without review-only overlays.",
+        },
       };
 
-      const checks = {
-        wide: [],
-        mobile: [
-          ["Guest frame is cropped", "Use a one-speaker focus crop or switch to stacked mobile layout."],
-          ["Caption competes with speaker frame", "Move captions higher for vertical export."],
-        ],
-        square: [
-          ["Logo is close to crop edge", "Use safer logo position for square previews."],
-        ],
-        thumbnail: [
-          ["Title may be small at thumbnail size", "Shorten title text or use a dedicated cover frame."],
-          ["Captions are not useful in thumbnail", "Hide captions for thumbnail export."],
-        ],
+      const moments = {
+        explanation: {
+          label: "Two-speaker explanation",
+          summary: "Use the default discussion moment to compare long-form, square, and mobile framing on the same beat.",
+          title: "Building a reusable podcast style",
+          caption: "Guest explains the launch story with host reaction.",
+          lowerThird: "Guest explains workflow",
+          sponsor: null,
+          reviewStamp: false,
+          checks: {
+            wide: [],
+            mobile: [
+              ["Guest frame is cropped", "Use a one-speaker focus crop or switch to stacked mobile layout."],
+              ["Caption competes with speaker frame", "Move captions higher for vertical export."],
+            ],
+            square: [
+              ["Logo is close to crop edge", "Use safer logo position for square previews."],
+            ],
+            thumbnail: [
+              ["Title may be small at thumbnail size", "Shorten title text or use a dedicated cover frame."],
+              ["Captions are not useful in thumbnail", "Hide captions for thumbnail export."],
+            ],
+            review: [
+              ["Reviewer cannot tell which framing choice is under discussion", "Keep the review marker visible while the creator compares this same moment."],
+            ],
+            archive: [],
+          },
+        },
+        reaction: {
+          label: "Guest reaction",
+          summary: "Reaction shots are where b-roll, captions, and quick crop changes usually hide facial expression first.",
+          title: "Unexpected guest reaction",
+          caption: "Host asks about a missed handoff moment during the launch recap.",
+          lowerThird: "Reaction moment",
+          sponsor: null,
+          reviewStamp: false,
+          checks: {
+            wide: [
+              ["Lower-third competes with guest reaction", "Move the lower-third or use a lighter reaction treatment for this moment."],
+            ],
+            mobile: [
+              ["Reaction frame becomes too tight", "Use a single-speaker crop before exporting the mobile cut."],
+            ],
+            square: [
+              ["Host and guest compete for the same square crop", "Switch to a reaction-first framing pass for square export."],
+            ],
+            thumbnail: [],
+            review: [],
+            archive: [],
+          },
+        },
+        sponsor: {
+          label: "Sponsor read",
+          summary: "Sponsored beats should be checked with overlays active so the creator sees the real conflict, not a clean frame that will never ship.",
+          title: "Sponsor break setup",
+          caption: "Quick sponsor read before the next chapter starts.",
+          lowerThird: "Host reads sponsor copy",
+          sponsor: "Sponsored mention",
+          reviewStamp: false,
+          checks: {
+            wide: [],
+            mobile: [
+              ["Sponsor badge competes with the speaker crop", "Use a safer sponsor position for the vertical export."],
+            ],
+            square: [
+              ["Caption and sponsor badge crowd the same zone", "Shorten the sponsor line or reduce the overlay stack for square preview."],
+            ],
+            thumbnail: [
+              ["Sponsor overlays are not useful in thumbnail view", "Hide sponsor-only overlays before exporting the thumbnail frame."],
+            ],
+            review: [
+              ["Review copy hides whether the sponsor badge will ship", "Keep the sponsor marker visible when the creator asks for approval on this frame."],
+            ],
+            archive: [
+              ["Archive master should not carry sponsor overlays", "Remove sponsor-only overlays before generating the archive master."],
+            ],
+          },
+        },
+        approval: {
+          label: "Title card approval",
+          summary: "Use the same timestamp for review-copy and final surfaces so approval comments stay anchored to the exact frame.",
+          title: "Review this title placement",
+          caption: "Producer requests sign-off on the current title and crop pairing.",
+          lowerThird: "Approval checkpoint",
+          sponsor: null,
+          reviewStamp: true,
+          checks: {
+            wide: [],
+            mobile: [
+              ["Title card becomes unreadable in mobile crop", "Use a shorter title or a stacked mobile version before approval."],
+            ],
+            square: [],
+            thumbnail: [
+              ["Title and review marker compete at small size", "Use a dedicated title frame for thumbnail export after approval."],
+            ],
+            review: [
+              ["Review marker covers the key title line", "Move the marker without hiding the title the reviewer is approving."],
+            ],
+            archive: [
+              ["Archive master still shows a review marker", "Clear review-only overlays before the archive package is generated."],
+            ],
+          },
+        },
       };
 
       let selectedSurface = "wide";
+      let selectedMoment = "explanation";
 
-      const toolbar = document.querySelector("#toolbar");
+      const surfaceToolbar = document.querySelector("#surfaceToolbar");
+      const momentToolbar = document.querySelector("#momentToolbar");
       const preview = document.querySelector("#preview");
       const issues = document.querySelector("#issues");
+      const titleText = document.querySelector("#titleText");
+      const captionText = document.querySelector("#captionText");
+      const lowerThird = document.querySelector("#lowerThird");
+      const sponsorTag = document.querySelector("#sponsorTag");
+      const reviewStamp = document.querySelector("#reviewStamp");
+      const contextSummary = document.querySelector("#contextSummary");
+      const issueChips = document.querySelector("#issueChips");
 
       function render() {
-        toolbar.replaceChildren(
+        surfaceToolbar.replaceChildren(
           ...Object.entries(surfaces).map(([id, label]) => {
             const button = document.createElement("button");
             button.type = "button";
-            button.textContent = label;
+            button.textContent = label.label;
             button.setAttribute("aria-pressed", String(id === selectedSurface));
             button.addEventListener("click", () => {
               selectedSurface = id;
@@ -293,12 +532,45 @@
           }),
         );
 
-        preview.className = `preview ${selectedSurface}`;
-        const currentChecks = checks[selectedSurface];
+        momentToolbar.replaceChildren(
+          ...Object.entries(moments).map(([id, moment]) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = moment.label;
+            button.setAttribute("aria-pressed", String(id === selectedMoment));
+            button.addEventListener("click", () => {
+              selectedMoment = id;
+              render();
+            });
+            return button;
+          }),
+        );
+
+        const moment = moments[selectedMoment];
+        const surface = surfaces[selectedSurface];
+        preview.className = `preview ${surface.previewClass}`;
+        titleText.textContent = moment.title;
+        captionText.textContent = moment.caption;
+        lowerThird.textContent = moment.lowerThird;
+        sponsorTag.hidden = !moment.sponsor;
+        sponsorTag.textContent = moment.sponsor || "";
+        reviewStamp.hidden = !moment.reviewStamp;
+
+        const currentChecks = moment.checks[selectedSurface];
+        contextSummary.innerHTML = `
+          <strong>${surface.label} · ${moment.label}</strong>
+          <span>${surface.note}</span>
+          <span>${moment.summary}</span>
+        `;
+        issueChips.replaceChildren(
+          renderChip(surface.label),
+          renderChip(moment.label),
+          renderChip(currentChecks.length ? `${currentChecks.length} checks` : "No warnings"),
+        );
         issues.replaceChildren(
           ...(currentChecks.length
             ? currentChecks.map(([title, action]) => renderIssue(title, action))
-            : [Object.assign(document.createElement("p"), { textContent: "No crop issues for this destination." })]),
+            : [Object.assign(document.createElement("p"), { textContent: "No crop issues for this destination and moment." })]),
         );
       }
 
@@ -307,6 +579,13 @@
         issue.className = "issue";
         issue.innerHTML = `<strong>${title}</strong><span>${action}</span>`;
         return issue;
+      }
+
+      function renderChip(label) {
+        return Object.assign(document.createElement("span"), {
+          className: "chip",
+          textContent: label,
+        });
       }
 
       render();
