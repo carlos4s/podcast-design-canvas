@@ -164,6 +164,10 @@
         border-left-color: var(--blocked);
       }
 
+      .warning.ignored {
+        border-left-color: #838d89;
+      }
+
       @media (max-width: 820px) {
         .grid {
           grid-template-columns: 1fr;
@@ -178,7 +182,7 @@
   <body>
     <main>
       <h1>Publish checklist</h1>
-      <p class="lede">Confirm the visible episode package before export. The checklist changes based on the destination and keeps optional items from blocking every show.</p>
+      <p class="lede">Confirm the visible episode package before export. The checklist changes based on the destination and reopens only the rows whose export meaning changed.</p>
 
       <section class="grid">
         <div class="panel">
@@ -198,9 +202,38 @@
 
     <script>
       const destinations = {
-        youtube: "YouTube full episode",
-        review: "Client review copy",
-        archive: "Archive master",
+        youtube: {
+          label: "YouTube full episode",
+          reopen: {
+            destination: "review",
+            export: "review",
+            approvals: "review",
+            package: "review",
+            thumbnail: "review",
+            metadata: "blocked",
+            sponsor: "review",
+          },
+        },
+        review: {
+          label: "Client review copy",
+          reopen: {
+            destination: "review",
+            export: "review",
+            approvals: "review",
+            package: "review",
+            watermark: "blocked",
+          },
+        },
+        archive: {
+          label: "Archive master",
+          reopen: {
+            destination: "review",
+            export: "review",
+            approvals: "review",
+            package: "review",
+            master: "review",
+          },
+        },
       };
 
       const items = [
@@ -229,6 +262,30 @@
           requiredFor: ["youtube"],
         },
         {
+          id: "sponsor",
+          label: "Sponsor disclosure",
+          detail: "Sponsor placement and disclosure are confirmed for the chosen destination.",
+          requiredFor: ["youtube"],
+        },
+        {
+          id: "destination",
+          label: "Destination preset",
+          detail: "The active destination preset still matches the package the creator is about to export.",
+          requiredFor: ["youtube", "review", "archive"],
+        },
+        {
+          id: "export",
+          label: "Export warnings",
+          detail: "Destination-specific export warnings are resolved or intentionally ignored.",
+          requiredFor: ["youtube", "review", "archive"],
+        },
+        {
+          id: "approvals",
+          label: "Review approvals",
+          detail: "Required sign-off for this destination is complete.",
+          requiredFor: ["youtube", "review", "archive"],
+        },
+        {
           id: "watermark",
           label: "Review watermark",
           detail: "Review copy is clearly labeled.",
@@ -240,6 +297,12 @@
           detail: "Master export settings are preserved.",
           requiredFor: ["archive"],
         },
+        {
+          id: "package",
+          label: "Final package",
+          detail: "The destination-specific package has been generated after the latest checklist changes.",
+          requiredFor: ["youtube", "review", "archive"],
+        },
       ];
 
       const stateLabels = {
@@ -250,10 +313,57 @@
         "not-needed": "Not needed",
       };
 
+      const stateMessages = {
+        thumbnail: {
+          review: "Choose or confirm a cover frame for this publish destination.",
+        },
+        metadata: {
+          blocked: "Update public title, description, chapters, or guest links before export.",
+        },
+        sponsor: {
+          review: "Recheck sponsor placement and disclosure for the public export.",
+        },
+        destination: {
+          review: "Confirm that the selected destination preset still matches this package.",
+        },
+        export: {
+          review: "Recheck the export warnings that matter for this destination.",
+        },
+        approvals: {
+          review: "Confirm the latest approvals against the destination you just selected.",
+        },
+        watermark: {
+          blocked: "Review copy must be visibly labeled before it leaves the workspace.",
+        },
+        master: {
+          review: "Confirm master-quality output for the archive handoff.",
+        },
+        package: {
+          review: "Generate this destination's package again after the destination change.",
+        },
+      };
+
       let selectedDestination = "youtube";
-      let itemStates = Object.fromEntries(items.map((item) => [item.id, "ready"]));
-      itemStates.thumbnail = "review";
-      itemStates.metadata = "blocked";
+      let itemStates = {
+        source: "ready",
+        captions: "ready",
+        thumbnail: "review",
+        metadata: "blocked",
+        sponsor: "review",
+        destination: "ready",
+        export: "ready",
+        approvals: "review",
+        watermark: "blocked",
+        master: "review",
+        package: "review",
+      };
+      let itemMessages = {
+        thumbnail: stateMessages.thumbnail.review,
+        metadata: stateMessages.metadata.blocked,
+        sponsor: stateMessages.sponsor.review,
+        approvals: stateMessages.approvals.review,
+        package: stateMessages.package.review,
+      };
 
       const destinationsElement = document.querySelector("#destinations");
       const checklistElement = document.querySelector("#checklist");
@@ -263,15 +373,12 @@
 
       function render() {
         destinationsElement.replaceChildren(
-          ...Object.entries(destinations).map(([id, label]) => {
+          ...Object.entries(destinations).map(([id, destination]) => {
             const button = document.createElement("button");
             button.type = "button";
-            button.textContent = label;
+            button.textContent = destination.label;
             button.setAttribute("aria-pressed", String(id === selectedDestination));
-            button.addEventListener("click", () => {
-              selectedDestination = id;
-              render();
-            });
+            button.addEventListener("click", () => changeDestination(id));
             return button;
           }),
         );
@@ -285,7 +392,7 @@
         warningsElement.replaceChildren(
           ...(result.warnings.length
             ? result.warnings.map(renderWarning)
-            : [Object.assign(document.createElement("p"), { textContent: "No destination warnings." })]),
+            : [makeElement("p", { textContent: "No destination warnings." })]),
         );
       }
 
@@ -294,12 +401,19 @@
         const state = required ? itemStates[item.id] : "not-needed";
         const article = document.createElement("article");
         article.className = "item";
-        article.innerHTML = `
-          <div>
-            <strong>${item.label}</strong>
-            <span>${item.detail}${required ? "" : " Not required for this destination."}</span>
-          </div>
-        `;
+
+        const detail = required && itemMessages[item.id]
+          ? `${item.detail} ${itemMessages[item.id]}`
+          : required
+            ? item.detail
+            : `${item.detail} Not required for this destination.`;
+
+        const copy = document.createElement("div");
+        copy.append(
+          makeElement("strong", { textContent: item.label }),
+          makeElement("span", { textContent: detail }),
+        );
+        article.append(copy);
 
         const select = document.createElement("select");
         select.disabled = !required;
@@ -315,6 +429,11 @@
         }
         select.addEventListener("change", () => {
           itemStates[item.id] = select.value;
+          if (stateMessages[item.id] && stateMessages[item.id][select.value]) {
+            itemMessages[item.id] = stateMessages[item.id][select.value];
+          } else {
+            delete itemMessages[item.id];
+          }
           render();
         });
         article.append(select);
@@ -337,18 +456,41 @@
           status,
           warnings,
           nextAction: status === "ready"
-            ? `Export ${destinations[selectedDestination]}.`
+            ? `Export ${destinations[selectedDestination].label}.`
             : status === "blocked"
               ? "Fix blocked checklist items before export."
-              : "Review or ignore warnings before final export.",
+              : "Review reopened or pending items before final export.",
         };
+      }
+
+      function changeDestination(nextDestination) {
+        if (nextDestination === selectedDestination) {
+          return;
+        }
+
+        selectedDestination = nextDestination;
+        itemMessages = {};
+        for (const [itemId, nextState] of Object.entries(destinations[nextDestination].reopen)) {
+          itemStates[itemId] = nextState;
+          if (stateMessages[itemId] && stateMessages[itemId][nextState]) {
+            itemMessages[itemId] = stateMessages[itemId][nextState];
+          }
+        }
+        render();
       }
 
       function renderWarning({ item, state }) {
         const warning = document.createElement("article");
         warning.className = `warning ${state}`;
-        warning.innerHTML = `<strong>${item.label}: ${stateLabels[state]}</strong><p>${item.detail}</p>`;
+        warning.append(
+          makeElement("strong", { textContent: `${item.label}: ${stateLabels[state]}` }),
+          makeElement("p", { textContent: itemMessages[item.id] || item.detail }),
+        );
         return warning;
+      }
+
+      function makeElement(tagName, props) {
+        return Object.assign(document.createElement(tagName), props);
       }
 
       render();
