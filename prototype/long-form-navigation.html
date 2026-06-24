@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Long-Form Episode Navigation Prototype</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17211f;
+        --muted: #5d6d67;
+        --line: #d7e1dd;
+        --panel: #f7faf8;
+        --accent: #136f63;
+        --accent-soft: #e2f5ef;
+        --review: #9a5b00;
+        --review-soft: #fff1d8;
+        --quiet: #eef3f1;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--ink); background: #ffffff; }
+      main { max-width: 1200px; margin: 0 auto; padding: 32px 20px 48px; }
+      h1, h2, h3, p { margin-top: 0; }
+      h1 { margin-bottom: 8px; font-size: 32px; line-height: 1.1; }
+      .lede { max-width: 780px; color: var(--muted); line-height: 1.5; }
+      .workspace { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr); gap: 24px; margin-top: 28px; }
+      .panel { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 18px; }
+      .toolbar, .actions, .player-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      .toolbar { justify-content: space-between; margin-bottom: 14px; }
+      label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
+      select {
+        min-height: 38px; border: 1px solid #becbc7; border-radius: 6px; background: #ffffff;
+        color: var(--ink); font: inherit; padding: 7px 10px;
+      }
+      button {
+        min-height: 36px; border: 1px solid #b9c8c3; border-radius: 6px; background: #ffffff;
+        color: var(--ink); font: inherit; font-weight: 700; padding: 7px 10px; cursor: pointer;
+      }
+      button.primary { border-color: var(--accent); background: var(--accent); color: #ffffff; }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      .timeline {
+        position: relative; height: 44px; margin: 8px 0 16px; border-radius: 999px;
+        background: linear-gradient(90deg, #dfe8e4, #eef4f2);
+      }
+      .played {
+        position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px 0 0 999px;
+        background: linear-gradient(90deg, #9fd9ca, #136f63);
+      }
+      .tick {
+        position: absolute; top: 7px; width: 30px; height: 30px; transform: translateX(-50%);
+        border: 2px solid #ffffff; border-radius: 999px; background: var(--review);
+      }
+      .tick.reviewed { background: var(--accent); }
+      .tick.snoozed { background: #9ca8a4; }
+      .tick.active { box-shadow: 0 0 0 4px rgba(19, 111, 99, 0.22); }
+      .moments { display: grid; gap: 12px; }
+      .moment {
+        display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 8px; background: #ffffff;
+        padding: 13px; border-left: 4px solid var(--review);
+      }
+      .moment.active { border-left-color: var(--accent); box-shadow: 0 0 0 2px rgba(19, 111, 99, 0.12); }
+      .moment.reviewed { border-left-color: var(--accent); }
+      .moment.snoozed { border-left-color: #9ca8a4; opacity: 0.82; }
+      .moment-head, .summary-row { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+      .moment strong { display: block; margin-bottom: 4px; }
+      .meta, .reason, .note, .context span { color: var(--muted); font-size: 13px; line-height: 1.45; }
+      .badge {
+        display: inline-flex; width: fit-content; min-height: 28px; align-items: center; border-radius: 999px;
+        padding: 0 10px; font-size: 13px; font-weight: 800; white-space: nowrap;
+      }
+      .badge.review { color: var(--review); background: var(--review-soft); }
+      .badge.ready { color: var(--accent); background: var(--accent-soft); }
+      .badge.quiet { color: #53635e; background: var(--quiet); }
+      .preview {
+        position: relative; overflow: hidden; aspect-ratio: 16 / 9; border: 1px solid #101816;
+        border-radius: 8px; background:
+          linear-gradient(180deg, rgba(16,24,22,0) 56%, rgba(16,24,22,0.74)),
+          linear-gradient(135deg, #174f49, #2f5870 58%, #756180);
+      }
+      .speaker-layout { position: absolute; inset: 15% 10% 21%; display: grid; grid-template-columns: 1fr 1fr; gap: 4%; }
+      .speaker {
+        position: relative; overflow: hidden; border-radius: 8px;
+        background: linear-gradient(160deg, #93c7bd, #1f6259);
+      }
+      .speaker.guest { background: linear-gradient(160deg, #b8b9dc, #465379); }
+      .speaker.active { outline: 3px solid rgba(255, 255, 255, 0.88); }
+      .speaker::before {
+        content: ""; position: absolute; top: 18%; left: 50%; width: 25%; aspect-ratio: 1;
+        transform: translateX(-50%); border-radius: 50%; background: #edf7f4;
+      }
+      .speaker::after {
+        content: ""; position: absolute; left: 30%; right: 30%; bottom: 13%; height: 32%;
+        border-radius: 999px 999px 0 0; background: rgba(232, 246, 241, 0.92);
+      }
+      .caption {
+        position: absolute; left: 9%; right: 9%; bottom: 7%; border-radius: 5px;
+        background: rgba(14, 22, 20, 0.86); color: #ffffff; font-size: 13px; font-weight: 800;
+        line-height: 1.35; padding: 8px 10px; text-align: center;
+      }
+      .callout {
+        position: absolute; top: 9%; left: 9%; max-width: 44%; border-radius: 6px;
+        background: rgba(255,255,255,0.92); color: #17211f; font-size: 12px; font-weight: 800;
+        padding: 7px 9px;
+      }
+      .playhead {
+        position: absolute; top: 0; bottom: 0; width: 3px; background: #f4d35e;
+      }
+      .player-row { justify-content: space-between; margin: 12px 0 16px; }
+      .time { font-size: 26px; line-height: 1; font-weight: 850; }
+      .context, .summary { display: grid; gap: 10px; margin-top: 14px; }
+      .context-card, .summary-card {
+        border: 1px solid var(--line); border-radius: 8px; background: #ffffff; padding: 12px;
+      }
+      .summary-card strong { display: block; font-size: 22px; line-height: 1; }
+      .empty { border: 1px dashed #b9c8c3; border-radius: 8px; padding: 16px; color: var(--muted); background: #ffffff; }
+      @media (max-width: 900px) {
+        .workspace { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Long-Form Episode Navigation Prototype</h1>
+      <p class="lede">
+        Move through an hour-plus episode by meaningful review moments. Each jump keeps the player, preview frame, active speaker, and owning review surface in sync.
+      </p>
+
+      <section class="workspace" aria-label="Long-form episode navigation">
+        <div class="panel">
+          <div class="toolbar">
+            <div>
+              <h2>Episode Map</h2>
+              <p class="note">Episode 48 - 01:08:12 total runtime</p>
+            </div>
+            <label>
+              Lane
+              <select id="laneFilter"></select>
+            </label>
+          </div>
+          <div class="timeline" id="timeline" aria-label="Episode timeline"></div>
+          <div class="actions">
+            <button type="button" id="showActive" class="primary">Show active moment</button>
+            <button type="button" id="toggleHidden">Show hidden moments</button>
+            <button type="button" id="reset">Reset sample</button>
+          </div>
+          <div class="moments" id="moments"></div>
+        </div>
+
+        <aside class="panel" aria-live="polite" aria-label="Episode preview">
+          <h2>Live Preview</h2>
+          <div class="preview" id="preview"></div>
+          <div class="player-row">
+            <div>
+              <div class="time" id="currentTime">00:00</div>
+              <div class="note" id="leadIn">Ready at the cold open</div>
+            </div>
+            <span class="badge quiet" id="speed">1x playback stays on</span>
+          </div>
+          <div class="context" id="context"></div>
+          <div class="summary" id="summary"></div>
+        </aside>
+      </section>
+    </main>
+
+    <script>
+      const episodeLength = 4092;
+      const leadInSeconds = 6;
+      const lanes = {
+        all: "All lanes",
+        chapters: "Chapters",
+        captions: "Captions",
+        audio: "Audio",
+        visuals: "B-roll and titles",
+        comments: "Review notes",
+      };
+
+      const baseMoments = [
+        {
+          id: "launch-story",
+          lane: "chapters",
+          time: 742,
+          speaker: "Guest",
+          title: "Guest introduces the launch story",
+          reason: "Chapter boundary is ready to preview before it carries into export.",
+          owner: "Chapter marker review",
+          caption: "We finally showed the first customer the rough version...",
+          action: "Open chapter review",
+        },
+        {
+          id: "caption-name",
+          lane: "captions",
+          time: 1395,
+          speaker: "Host",
+          title: "Name spelling needs a caption check",
+          reason: "The visible caption may spell Priya's company two different ways.",
+          owner: "Caption quality review",
+          caption: "Priya from Northstar Labs made the intro.",
+          action: "Open caption review",
+        },
+        {
+          id: "pause-cleanup",
+          lane: "audio",
+          time: 2118,
+          speaker: "Guest",
+          title: "Long pause before answer",
+          reason: "Jump with lead-in so the creator can hear whether the silence feels natural.",
+          owner: "Audio cleanup controls",
+          caption: "I needed a minute to choose the honest answer.",
+          action: "Open audio cleanup",
+        },
+        {
+          id: "title-card",
+          lane: "visuals",
+          time: 2836,
+          speaker: "Host",
+          title: "Title moment after pricing lesson",
+          reason: "Preview the lower-third, caption, and title card together before approving it.",
+          owner: "Contextual title cards",
+          caption: "That became our pricing lesson.",
+          action: "Open title card",
+        },
+        {
+          id: "producer-note",
+          lane: "comments",
+          time: 3474,
+          speaker: "Guest",
+          title: "Producer note on ending pace",
+          reason: "A collaborator asked whether the final example should stay in the episode.",
+          owner: "Review handoff",
+          caption: "The second example may be too much for the ending.",
+          action: "Open review note",
+        },
+      ];
+
+      let moments = freshMoments();
+      let activeId = moments[0].id;
+      let showHidden = false;
+
+      const laneFilter = document.querySelector("#laneFilter");
+      const timeline = document.querySelector("#timeline");
+      const momentsElement = document.querySelector("#moments");
+      const preview = document.querySelector("#preview");
+      const currentTime = document.querySelector("#currentTime");
+      const leadIn = document.querySelector("#leadIn");
+      const context = document.querySelector("#context");
+      const summary = document.querySelector("#summary");
+      const toggleHidden = document.querySelector("#toggleHidden");
+
+      document.querySelector("#showActive").addEventListener("click", () => {
+        laneFilter.value = "all";
+        showHidden = true;
+        render();
+      });
+      toggleHidden.addEventListener("click", () => {
+        showHidden = !showHidden;
+        render();
+      });
+      document.querySelector("#reset").addEventListener("click", () => {
+        moments = freshMoments();
+        activeId = moments[0].id;
+        showHidden = false;
+        laneFilter.value = "all";
+        render();
+      });
+
+      function freshMoments() {
+        return baseMoments.map((moment) => ({ ...moment, state: "new", opened: false }));
+      }
+
+      function activeMoment() {
+        return moments.find((moment) => moment.id === activeId) || moments[0];
+      }
+
+      function visibleMoments() {
+        return moments.filter((moment) => {
+          const laneMatches = laneFilter.value === "all" || moment.lane === laneFilter.value;
+          const visible = showHidden || !["reviewed", "snoozed"].includes(moment.state);
+          return laneMatches && visible;
+        });
+      }
+
+      function jumpTo(id) {
+        activeId = id;
+        render();
+      }
+
+      function setState(id, nextState) {
+        const moment = moments.find((item) => item.id === id);
+        moment.state = nextState;
+        activeId = id;
+        render();
+      }
+
+      function openOwner(id) {
+        const moment = moments.find((item) => item.id === id);
+        moment.opened = true;
+        activeId = id;
+        render();
+      }
+
+      function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const remaining = seconds % 60;
+        return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
+      }
+
+      function createText(tag, text, className) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        element.textContent = text;
+        return element;
+      }
+
+      function renderLaneFilter() {
+        laneFilter.replaceChildren(
+          ...Object.entries(lanes).map(([value, label]) => {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = label;
+            option.selected = value === laneFilter.value || (!laneFilter.value && value === "all");
+            return option;
+          }),
+        );
+        if (!laneFilter.value) laneFilter.value = "all";
+      }
+
+      function renderTimeline() {
+        const active = activeMoment();
+        const played = document.createElement("div");
+        played.className = "played";
+        played.style.width = `${(active.time / episodeLength) * 100}%`;
+        timeline.replaceChildren(played);
+        moments.forEach((moment) => {
+          const tick = document.createElement("button");
+          tick.type = "button";
+          tick.className = `tick ${moment.state === "new" ? "" : moment.state} ${moment.id === active.id ? "active" : ""}`;
+          tick.style.left = `${(moment.time / episodeLength) * 100}%`;
+          tick.setAttribute("aria-label", `Jump to ${moment.title}`);
+          tick.addEventListener("click", () => jumpTo(moment.id));
+          timeline.append(tick);
+        });
+      }
+
+      function renderMoments() {
+        const cards = visibleMoments().map((moment) => {
+          const card = document.createElement("article");
+          card.className = `moment ${moment.id === activeId ? "active" : ""} ${moment.state}`;
+
+          const head = document.createElement("div");
+          head.className = "moment-head";
+          const titleWrap = document.createElement("div");
+          titleWrap.append(createText("strong", moment.title), createText("div", `${formatTime(moment.time)} - ${lanes[moment.lane]} - ${moment.speaker}`, "meta"));
+          const badge = createText("span", statusLabel(moment), badgeClass(moment));
+          head.append(titleWrap, badge);
+
+          const actions = document.createElement("div");
+          actions.className = "actions";
+          actions.append(
+            actionButton("Jump with lead-in", () => jumpTo(moment.id), true),
+            actionButton(moment.action, () => openOwner(moment.id), false),
+            actionButton("Mark reviewed", () => setState(moment.id, "reviewed"), false),
+            actionButton(moment.state === "snoozed" ? "Restore" : "Snooze", () => setState(moment.id, moment.state === "snoozed" ? "new" : "snoozed"), false),
+          );
+          card.append(head, createText("p", moment.reason, "reason"), actions);
+          return card;
+        });
+        momentsElement.replaceChildren(...cards);
+        if (!cards.length) {
+          momentsElement.append(createText("div", "No moments match this lane. Show hidden moments or choose another lane.", "empty"));
+        }
+      }
+
+      function actionButton(label, handler, primary) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        if (primary) button.className = "primary";
+        button.addEventListener("click", handler);
+        return button;
+      }
+
+      function statusLabel(moment) {
+        if (moment.state === "reviewed") return "reviewed here";
+        if (moment.state === "snoozed") return "snoozed";
+        if (moment.opened) return "owner opened";
+        return "needs a look";
+      }
+
+      function badgeClass(moment) {
+        if (moment.state === "reviewed") return "badge ready";
+        if (moment.state === "snoozed") return "badge quiet";
+        return "badge review";
+      }
+
+      function renderPreview() {
+        const moment = activeMoment();
+        const leadTime = Math.max(0, moment.time - leadInSeconds);
+        currentTime.textContent = formatTime(leadTime);
+        leadIn.textContent = `Jumped to ${formatTime(moment.time)} with ${leadInSeconds}s lead-in`;
+
+        const layout = document.createElement("div");
+        layout.className = "speaker-layout";
+        const host = document.createElement("div");
+        host.className = `speaker host ${moment.speaker === "Host" ? "active" : ""}`;
+        const guest = document.createElement("div");
+        guest.className = `speaker guest ${moment.speaker === "Guest" ? "active" : ""}`;
+        layout.append(host, guest);
+
+        const callout = createText("div", lanes[moment.lane], "callout");
+        const caption = createText("div", moment.caption, "caption");
+        const playhead = document.createElement("div");
+        playhead.className = "playhead";
+        playhead.style.left = `${(moment.time / episodeLength) * 100}%`;
+        preview.replaceChildren(layout, callout, caption, playhead);
+      }
+
+      function renderContext() {
+        const moment = activeMoment();
+        const ownerText = moment.opened
+          ? `${moment.owner} is open; navigation keeps this timestamp selected.`
+          : `${moment.owner} owns the fix if this moment needs editing.`;
+        const activeCard = document.createElement("div");
+        activeCard.className = "context-card";
+        activeCard.append(createText("strong", moment.title), createText("span", ownerText));
+        const positionCard = document.createElement("div");
+        positionCard.className = "context-card";
+        positionCard.append(createText("strong", "Playback context"), createText("span", `${moment.speaker} is active, captions stay visible, and playback speed remains unchanged.`));
+        context.replaceChildren(activeCard, positionCard);
+      }
+
+      function renderSummary() {
+        const openCount = moments.filter((moment) => moment.state === "new").length;
+        const reviewedCount = moments.filter((moment) => moment.state === "reviewed").length;
+        const hiddenCount = moments.filter((moment) => ["reviewed", "snoozed"].includes(moment.state)).length;
+        summary.replaceChildren(
+          summaryCard(String(openCount), "moments in the default review path"),
+          summaryCard(String(reviewedCount), "moments handled without clearing unrelated warnings"),
+          summaryCard(String(hiddenCount), "recoverable hidden moments"),
+        );
+      }
+
+      function summaryCard(value, label) {
+        const card = document.createElement("div");
+        card.className = "summary-card";
+        card.append(createText("strong", value), createText("span", label));
+        return card;
+      }
+
+      function render() {
+        renderLaneFilter();
+        renderTimeline();
+        renderMoments();
+        renderPreview();
+        renderContext();
+        renderSummary();
+        toggleHidden.textContent = showHidden ? "Hide handled moments" : "Show hidden moments";
+      }
+
+      laneFilter.addEventListener("change", render);
+      render();
+    </script>
+  </body>
+</html>
